@@ -1,17 +1,19 @@
 {
-  "domain": "infra_power_monitor",
-  "name": "Infra Power Monitor",
-  "version": "1.0.0",
-  "documentation": "https://github.com/macpla/infra_power_monitor",
-  "dependencies": [],
-  "codeowners": ["@MacPla"],
-  "requirements": [],
-  "iot_class": "local_polling",
-  "config_flow": true,
-  "integration_type": "device",
-  "frontend": {
-    "extra_module_url": [
-      "/infra_power_monitor/infra-power-dashboard.js"
-    ]
-  }
+    "domain": "infra_power_monitor",
+    "name": "Infra Power Monitor",
+    "version": "1.0.0",
+    "documentation": "https://github.com/macpla/infra_power_monitor",
+    "dependencies": [],
+    "codeowners": [
+        "@MacPla"
+    ],
+    "requirements": [],
+    "iot_class": "local_polling",
+    "config_flow": true,
+    "integration_type": "device",
+    "frontend": {
+        "extra_module_url": [
+            "/infra_power_monitor/infra-power-dashboard.js"
+        ]
+    }
 }

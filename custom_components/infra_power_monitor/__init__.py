@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+import os
 
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.config_entries import ConfigEntry
@@ -30,6 +32,72 @@ from .providers.wol import WakeOnLanProvider
 from .providers.hybrid import HybridProvider
 
 _LOGGER = logging.getLogger(__name__)
+
+LOVELACE_STORAGE_FILE = os.path.join(".storage", "lovelace")
+INFRA_POWER_DASHBOARD_PATH = "infra-power"
+
+
+def _read_lovelace_storage(storage_path: str) -> dict[str, object]:
+    if not os.path.exists(storage_path):
+        return {
+            "key": "lovelace",
+            "version": 1,
+            "data": {"dashboards": [], "resources": []},
+        }
+
+    with open(storage_path, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def _write_lovelace_storage(storage_path: str, data: dict[str, object]) -> None:
+    os.makedirs(os.path.dirname(storage_path), exist_ok=True)
+    with open(storage_path, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=2)
+
+
+async def _async_ensure_infra_power_dashboard(hass: HomeAssistant) -> None:
+    storage_path = hass.config.path(LOVELACE_STORAGE_FILE)
+    storage = await hass.async_add_executor_job(_read_lovelace_storage, storage_path)
+
+    dashboards = storage.setdefault("data", {}).setdefault("dashboards", [])
+    if any(
+        dashboard.get("url_path") == INFRA_POWER_DASHBOARD_PATH
+        for dashboard in dashboards
+    ):
+        return
+
+    dashboards.append(
+        {
+            "id": "infra_power",
+            "url_path": INFRA_POWER_DASHBOARD_PATH,
+            "title": "Infra Power",
+            "icon": "mdi:server",
+            "show_in_sidebar": True,
+            "sidebar_title": "Infra Power",
+            "sidebar_icon": "mdi:server",
+            "require_admin": False,
+            "mode": "storage",
+            "views": [
+                {
+                    "id": "overview",
+                    "title": "Overview",
+                    "path": "overview",
+                    "icon": "mdi:server",
+                    "type": "sections",
+                    "max_columns": 4,
+                    "sections": [
+                        {
+                            "type": "grid",
+                            "column_span": 4,
+                            "cards": [],
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+    await hass.async_add_executor_job(_write_lovelace_storage, storage_path, storage)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -64,6 +132,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             config={"url": "/lovelace/infra-power"},
         )
         hass.data[f"{DOMAIN}_panel"] = True
+
+    await _async_ensure_infra_power_dashboard(hass)
 
     if backend == "idrac":
         provider = IdracProvider(
