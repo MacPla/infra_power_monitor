@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 
+from homeassistant.components.frontend import async_register_built_in_panel
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.lovelace.const import (
     CONF_ICON,
@@ -46,10 +47,32 @@ _LOGGER = logging.getLogger(__name__)
 INFRA_POWER_DASHBOARD_PATH = "infra-power"
 
 
+def _register_infra_power_panel(hass: HomeAssistant) -> None:
+    if f"{DOMAIN}_panel" in hass.data:
+        return
+
+    try:
+        async_register_built_in_panel(
+            hass,
+            component_name="lovelace",
+            sidebar_title="Infra Power",
+            sidebar_icon="mdi:server",
+            frontend_url_path=INFRA_POWER_DASHBOARD_PATH,
+            config={"mode": "storage", "url_path": INFRA_POWER_DASHBOARD_PATH},
+        )
+        hass.data[f"{DOMAIN}_panel"] = True
+    except Exception as exc:
+        _LOGGER.warning(
+            "Infra Power sidebar panel could not be registered: %s",
+            exc,
+        )
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     if hass.config_entries.async_entries(DOMAIN):
         await _async_ensure_infra_power_dashboard(hass)
 
+    _register_infra_power_panel(hass)
     return True
 
 
@@ -108,6 +131,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[f"{DOMAIN}_static"] = True
 
     await _async_ensure_infra_power_dashboard(hass)
+    _register_infra_power_panel(hass)
 
     if backend == "idrac":
         provider = IdracProvider(
