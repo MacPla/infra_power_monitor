@@ -3,7 +3,10 @@ from __future__ import annotations
 import logging
 import os
 
-from homeassistant.components.frontend import async_register_built_in_panel
+from homeassistant.components.frontend import (
+    add_extra_js_url,
+    async_register_built_in_panel,
+)
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.lovelace.const import (
     CONF_ICON,
@@ -57,6 +60,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 False,
             )
         ]
+    )
+    add_extra_js_url(
+        hass, "/infra_power_monitor_static/infra-power-dashboard.js?v=1.0.2"
     )
     return True
 
