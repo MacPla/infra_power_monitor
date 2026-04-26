@@ -30,16 +30,18 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     )
 
     # Register the custom panel (Alarmo style)
-    await panel_custom.async_register_panel(
-        hass,
-        webcomponent_name="infra-power-panel",
-        frontend_url_path="infra-power",
-        module_url=f"/infra_power_monitor_static/infra-power-dashboard.js?v={VERSION}",
-        sidebar_title="Infra Power",
-        sidebar_icon="mdi:server",
-        require_admin=False,
-        config={},
-    )
+    # Check if already registered to avoid "Overwriting panel" error
+    if "infra-power" not in hass.data.get("frontend_panels", {}):
+        await panel_custom.async_register_panel(
+            hass,
+            webcomponent_name="infra-power-panel",
+            frontend_url_path="infra-power",
+            module_url=f"/infra_power_monitor_static/infra-power-dashboard.js?v={VERSION}",
+            sidebar_title="Infra Power",
+            sidebar_icon="mdi:server",
+            require_admin=False,
+            config={},
+        )
 
     return True
 
