@@ -1,8 +1,8 @@
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 
 /**
- * Infra Power Monitor Panel - FINAL STABLE VERSION
+ * Infra Power Monitor Panel - RESILIENT VERSION
  */
 class InfraPowerPanel extends HTMLElement {
   set hass(hass) {
@@ -30,34 +30,16 @@ class InfraPowerPanel extends HTMLElement {
             max-width: 1400px;
             margin: 0 auto;
           }
-          .header {
-            margin-bottom: 32px;
-          }
-          h1 {
-            margin: 0;
-            font-size: 32px;
-            font-weight: 300;
-            letter-spacing: -0.5px;
-          }
+          h1 { margin: 0 0 32px 0; font-size: 32px; font-weight: 300; }
           .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
             gap: 24px;
-          }
-          @media (max-width: 600px) {
-            .grid {
-              grid-template-columns: 1fr;
-              padding: 8px;
-            }
           }
         </style>
         <div class="container">
-          <div class="header">
-            <h1>Infra Power Monitor</h1>
-          </div>
-          <div id="grid" class="grid">
-            <div style="padding: 40px; text-align: center;">Cargando dispositivos...</div>
-          </div>
+          <h1>Infra Power Monitor</h1>
+          <div id="grid" class="grid"><div style="padding: 20px;">Iniciando...</div></div>
         </div>
       `;
     }
@@ -73,128 +55,106 @@ class InfraPowerPanel extends HTMLElement {
       .sort();
 
     if (powerStateEntities.length === 0) {
-        grid.innerHTML = '<div style="padding: 40px; opacity: 0.6; text-align: center;">No hay dispositivos configurados.</div>';
+        grid.innerHTML = '<div style="padding: 20px; opacity: 0.5;">No hay dispositivos detectados.</div>';
         return;
     }
 
-    const entitiesKey = JSON.stringify(powerStateEntities);
-    if (this._renderedEntities === entitiesKey) {
-        Array.from(grid.children).forEach(card => {
-            if (card.hass !== hass) card.hass = hass;
-        });
+    // Detect available custom elements
+    const hasStack = customElements.get('stack-in-card') || customElements.get('hui-stack-in-card');
+    const hasButton = customElements.get('button-card') || customElements.get('hui-button-card');
+    
+    const key = JSON.stringify(powerStateEntities) + "_" + hasStack + "_" + hasButton;
+    if (this._renderedKey === key) {
+        Array.from(grid.children).forEach(c => { if (c.hass !== hass) c.hass = hass; });
         return;
     }
 
-    this._renderedEntities = entitiesKey;
+    this._renderedKey = key;
     grid.innerHTML = '';
 
-    // Wait for card helpers
     const helpers = window.loadCardHelpers ? await window.loadCardHelpers() : null;
     if (!helpers) return;
 
     for (const entityId of powerStateEntities) {
-      const config = this._generateCardConfig(entityId, states);
+      const config = this._generateResilientConfig(entityId, states, hasStack, hasButton);
       const card = helpers.createCardElement(config);
       card.hass = hass;
       grid.appendChild(card);
     }
   }
 
-  _generateCardConfig(powerStateEntity, states) {
-    const raw = powerStateEntity.replace(/^sensor\./, "");
+  _generateResilientConfig(entityId, states, hasStack, hasButton) {
+    const raw = entityId.replace(/^sensor\./, "");
     const match = raw.match(/^(.*?)(?:_power_state)(?:_(\d+))?$/);
     const base = match ? match[1] : raw;
     const suffix = (match && match[2]) ? `_${match[2]}` : "";
-    const name = this._prettyName(base);
+    const name = base.toUpperCase().replace(/_/g, " ");
 
-    const health = `sensor.${base}_health${suffix}`;
-    const firmware = `sensor.${base}_firmware_version${suffix}`;
-    const temp = [`sensor.${base}_cpu_temp${suffix}`, `sensor.${base}_system_board_inlet_temp${suffix}`, `sensor.${base}_system_temp${suffix}`].find(id => !!states[id]) || "";
+    // If we don't have the custom cards, use the built-in Entities card
+    if (!hasStack || !hasButton) {
+        return {
+            type: "entities",
+            title: name,
+            entities: [
+                entityId,
+                `sensor.${base}_health${suffix}`,
+                `sensor.${base}_cpu_temp${suffix}`,
+                `sensor.${base}_power_usage${suffix}`,
+                { type: "divider" },
+                `button.${base}_power_on${suffix}`,
+                `button.${base}_power_off${suffix}`,
+                `button.${base}_restart${suffix}`,
+                `button.${base}_refresh${suffix}`
+            ].filter(id => typeof id === 'object' || !!states[id])
+        };
+    }
 
+    // Beautiful version (requires stack-in-card and button-card)
     return {
       type: "custom:stack-in-card",
       cards: [
         {
           type: "custom:button-card",
-          entity: powerStateEntity,
-          name,
+          entity: entityId,
+          name: name,
           icon: "mdi:server",
           show_state: true,
           show_label: true,
-          tap_action: { action: "more-info" },
           variables: {
-            health_entity: health,
-            temp_entity: temp,
-            firmware_entity: firmware,
+            health: `sensor.${base}_health${suffix}`,
+            temp: `sensor.${base}_cpu_temp${suffix}`,
+            fw: `sensor.${base}_firmware_version${suffix}`
           },
           label: `[[[
-            const valid = v => v && v !== 'unknown' && v !== 'unavailable';
-            const health = states[variables.health_entity]?.state;
-            const temp = variables.temp_entity ? states[variables.temp_entity]?.state : undefined;
-            const fw = states[variables.firmware_entity]?.state;
-
+            const v = (id) => states[id]?.state;
             const parts = [];
-            if (valid(health)) parts.push(\`Health: \${health}\`);
-            if (valid(temp)) parts.push(\`Temp: \${temp} °C\`);
-            if (valid(fw)) parts.push(\`FW: \${fw}\`);
+            if (v(variables.health)) parts.push('Health: ' + v(variables.health));
+            if (v(variables.temp)) parts.push('Temp: ' + v(variables.temp) + '°C');
             return parts.join(' · ');
           ]]]`,
           styles: {
             card: [
-              { "border-radius": "20px 20px 0 0" },
-              { padding: "20px" },
-              { height: "160px" },
-              {
-                "background": `[[[
-                  const s = (entity.state || '').trim();
-                  if (s === 'Encendido') return 'linear-gradient(135deg, rgba(8,77,33,0.95), rgba(5,47,20,0.95))';
-                  if (s === 'Apagado') return 'linear-gradient(135deg, rgba(55,55,55,0.7), rgba(25,25,25,0.9))';
-                  return 'linear-gradient(135deg, rgba(40,40,40,0.7), rgba(20,20,20,0.9))';
-                ]]]`,
-              },
+              { "border-radius": "16px 16px 0 0" },
+              { padding: "16px" },
+              { background: "linear-gradient(135deg, rgba(50,50,50,0.5), rgba(20,20,20,0.8))" }
             ],
-            grid: [
-              { "grid-template-areas": '"i n" "i s" "i l"' },
-              { "grid-template-columns": "80px 1fr" },
-              { "row-gap": "4px" },
-            ],
-            icon: [{ width: "60px" }, { height: "60px" }, { color: "white" }],
-            name: [{ "justify-self": "start" }, { "font-size": "28px" }, { "font-weight": "600" }],
-            state: [{ "justify-self": "start" }, { "font-size": "18px" }, { opacity: "0.9" }],
-            label: [{ "justify-self": "start" }, { "font-size": "13px" }, { opacity: "0.7" }],
-          },
+            grid: [{ "grid-template-areas": '"i n" "i s" "i l"' }, { "grid-template-columns": "70px 1fr" }],
+            name: [{ "justify-self": "start" }, { "font-size": "24px" }, { "font-weight": "bold" }],
+            state: [{ "justify-self": "start" }],
+            label: [{ "justify-self": "start" }, { opacity: "0.6" }, { "font-size": "12px" }]
+          }
         },
         {
           type: "horizontal-stack",
-          cards: [
-            this._btn(base, suffix, "power_on", "ON", "mdi:power"),
-            this._btn(base, suffix, "power_off", "OFF", "mdi:power-off"),
-            this._btn(base, suffix, "restart", "RST", "mdi:restart"),
-            this._btn(base, suffix, "refresh", "REF", "mdi:refresh"),
-          ],
-        },
-      ],
+          cards: ["power_on", "power_off", "restart", "refresh"].map(k => ({
+            type: "custom:button-card",
+            entity: `button.${base}_${k}${suffix}`,
+            name: k.replace("power_", "").toUpperCase(),
+            styles: { card: [{ height: "45px" }, { "border-radius": "0" }, { border: "none" }, { background: "rgba(255,255,255,0.05)" }] }
+          })).filter(c => !!states[c.entity])
+        }
+      ]
     };
-  }
-
-  _btn(base, suffix, kind, label, icon) {
-    const entityId = `button.${base}_${kind}${suffix}`;
-    return {
-      type: "custom:button-card",
-      entity: entityId,
-      name: label,
-      icon: icon,
-      color_type: "card",
-      styles: {
-        card: [{ height: "50px" }, { "border-radius": "0" }, { "background-color": "rgba(255,255,255,0.05)" }, { border: "none" }],
-        name: [{ "font-size": "12px" }, { "font-weight": "bold" }],
-        icon: [{ width: "20px" }],
-      },
-    };
-  }
-
-  _prettyName(base) {
-    return base.split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   }
 }
 
