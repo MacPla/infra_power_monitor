@@ -37,6 +37,35 @@ LOVELACE_STORAGE_FILE = os.path.join(".storage", "lovelace")
 INFRA_POWER_DASHBOARD_PATH = "infra-power"
 
 
+def _register_infra_power_panel(hass: HomeAssistant) -> None:
+    if f"{DOMAIN}_panel" in hass.data:
+        return
+
+    try:
+        hass.components.frontend.async_register_built_in_panel(
+            component_name="iframe",
+            sidebar_title="Infra Power",
+            sidebar_icon="mdi:server",
+            frontend_url_path="infra-power",
+            config={"url": "/lovelace/infra-power"},
+        )
+        hass.data[f"{DOMAIN}_panel"] = True
+    except Exception as exc:
+        _LOGGER.warning(
+            "Infra Power sidebar panel could not be registered: %s",
+            exc,
+        )
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    _register_infra_power_panel(hass)
+
+    if hass.config_entries.async_entries(DOMAIN):
+        hass.async_create_task(_async_ensure_infra_power_dashboard(hass))
+
+    return True
+
+
 def _read_lovelace_storage(storage_path: str) -> dict[str, object]:
     if not os.path.exists(storage_path):
         return {
@@ -123,16 +152,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         hass.data[f"{DOMAIN}_static"] = True
 
-    if f"{DOMAIN}_panel" not in hass.data:
-        hass.components.frontend.async_register_built_in_panel(
-            component_name="iframe",
-            sidebar_title="Infra Power",
-            sidebar_icon="mdi:server",
-            frontend_url_path="infra-power",
-            config={"url": "/lovelace/infra-power"},
-        )
-        hass.data[f"{DOMAIN}_panel"] = True
-
+    _register_infra_power_panel(hass)
     await _async_ensure_infra_power_dashboard(hass)
 
     if backend == "idrac":
