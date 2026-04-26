@@ -1,10 +1,8 @@
 
-const VERSION = "1.0.3";
+const VERSION = "1.0.7";
 
 /**
  * Infra Power Monitor Panel
- * This is a custom panel that renders a Lovelace-like interface
- * but as a standalone web component (Alarmo style).
  */
 class InfraPowerPanel extends HTMLElement {
   set hass(hass) {
@@ -25,6 +23,7 @@ class InfraPowerPanel extends HTMLElement {
             height: 100%;
             background-color: var(--primary-background-color);
             overflow-y: auto;
+            color: var(--primary-text-color);
           }
           .container {
             padding: 16px;
@@ -53,13 +52,19 @@ class InfraPowerPanel extends HTMLElement {
               grid-template-columns: 1fr;
             }
           }
+          .error-msg {
+            padding: 40px;
+            text-align: center;
+            grid-column: 1/-1;
+            opacity: 0.7;
+          }
         </style>
         <div class="container">
           <div class="header">
             <h1>Infra Power Monitor</h1>
           </div>
           <div id="grid" class="grid">
-            <div style="padding: 20px; text-align: center; opacity: 0.5;">Cargando dispositivos...</div>
+            <div class="error-msg">Iniciando interfaz...</div>
           </div>
         </div>
       `;
@@ -71,64 +76,61 @@ class InfraPowerPanel extends HTMLElement {
     if (!grid) return;
 
     const states = hass.states;
+    // Find all power state sensors
     const powerStateEntities = Object.keys(states)
-      .filter((id) => /^sensor\..+_power_state(_\d+)?$/.test(id))
+      .filter((id) => id.startsWith('sensor.') && id.includes('_power_state'))
       .sort();
 
     if (powerStateEntities.length === 0) {
-        grid.innerHTML = '<div style="padding: 40px; text-align: center; grid-column: 1/-1;">No se han encontrado sensores de estado de energía.</div>';
+        if (!this._emptyNotified) {
+            grid.innerHTML = '<div class="error-msg">No se han encontrado sensores de estado. Verifica que la integración esté configurada.</div>';
+            this._emptyNotified = true;
+        }
         return;
     }
+    this._emptyNotified = false;
 
-    // Only redraw if the number of entities changed or first load
-    if (this._renderedEntities === JSON.stringify(powerStateEntities)) {
-        // Update existing cards if needed (handled by the cards themselves if we use HA elements)
-        // For simplicity in this version, we will re-render if states changed significantly
-        // But to avoid flicker, we'll just update the Hass property on children
+    // Only full redraw if entities changed
+    const entitiesKey = JSON.stringify(powerStateEntities);
+    if (this._renderedEntities === entitiesKey) {
+        // Just update Hass on existing cards
         Array.from(grid.children).forEach(card => {
-            if (card.hass) card.hass = hass;
+            if (card.hass !== hass) card.hass = hass;
         });
         return;
     }
 
-    this._renderedEntities = JSON.stringify(powerStateEntities);
+    this._renderedEntities = entitiesKey;
     grid.innerHTML = '';
 
     for (const entityId of powerStateEntities) {
-      const card = document.createElement('hui-stack-in-card');
-      
-      // Prepare the configuration for the stack-in-card
       const config = this._generateCardConfig(entityId, states);
       
-      // Initialize the card
-      if (customElements.get('hui-stack-in-card')) {
-        card.setConfig(config);
-        card.hass = hass;
-        grid.appendChild(card);
+      // Use HA's internal card creator if available, or fallback to manual
+      let card;
+      const helpers = window.loadCardHelpers ? await window.loadCardHelpers() : null;
+      
+      if (helpers && helpers.createCardElement) {
+          card = helpers.createCardElement(config);
       } else {
-        // If stack-in-card is not loaded, try to load it or show a placeholder
-        const placeholder = document.createElement('div');
-        placeholder.style.padding = "20px";
-        placeholder.innerText = `Cargando card para ${entityId}...`;
-        grid.appendChild(placeholder);
-        
-        // Try to trigger Lovelace to load the dependencies
-        this._loadDependencies();
+          // Manual fallback (less reliable but works as backup)
+          card = document.createElement('hui-stack-in-card');
+          if (card.setConfig) card.setConfig(config);
       }
+      
+      card.hass = hass;
+      grid.appendChild(card);
     }
-  }
-
-  _loadDependencies() {
-    // This is a hack to ensure common Lovelace elements are loaded
-    const event = new Event("ll-rebuild", { bubbles: true, cancelable: true, composed: true });
-    this.dispatchEvent(event);
   }
 
   _generateCardConfig(powerStateEntity, states) {
     const raw = powerStateEntity.replace(/^sensor\./, "");
-    const match = raw.match(/^(.*)_power_state(_\d+)?$/);
+    // Try to extract base name. Matches "studio_power_state" or "truenas_power_state_2"
+    const match = raw.match(/^(.*?)(?:_power_state)(?:_(\d+))?$/);
+    if (!match) return { type: "error", error: "Entity name pattern mismatch" };
+    
     const base = match[1];
-    const suffix = match[2] || "";
+    const suffix = match[2] ? `_${match[2]}` : "";
 
     const name = this._prettyName(base);
 
@@ -159,19 +161,6 @@ class InfraPowerPanel extends HTMLElement {
 
     return {
       type: "custom:stack-in-card",
-      mode: "vertical",
-      keep: { background: true, border_radius: true, margin: true },
-      card_mod: {
-        style: `
-          ha-card {
-            border: none !important;
-            box-shadow: none !important;
-            background: transparent !important;
-            padding: 0 !important;
-            overflow: hidden !important;
-          }
-        `,
-      },
       cards: [
         {
           type: "custom:button-card",
@@ -203,8 +192,6 @@ class InfraPowerPanel extends HTMLElement {
               { "border-radius": "18px 18px 0 0" },
               { padding: "18px" },
               { height: "170px" },
-              { "box-shadow": "none" },
-              { transition: "background 280ms ease, border 280ms ease, transform 180ms ease, filter 180ms ease" },
               {
                 "background-color": `[[[
                   const s = (entity.state || '').trim();
@@ -248,9 +235,6 @@ class InfraPowerPanel extends HTMLElement {
             icon: [
               { width: "54px" },
               { height: "54px" },
-              { "align-self": "start" },
-              { "justify-self": "center" },
-              { transition: "color 280ms ease, transform 180ms ease" },
               {
                 color: `[[[
                   const s = (entity.state || '').trim();
@@ -262,26 +246,9 @@ class InfraPowerPanel extends HTMLElement {
                 ]]]`,
               },
             ],
-            name: [
-              { "justify-self": "start" },
-              { "align-self": "end" },
-              { "font-size": "26px" },
-              { "font-weight": "700" },
-            ],
-            state: [
-              { "justify-self": "start" },
-              { "align-self": "center" },
-              { "font-size": "16px" },
-              { opacity: "0.95" },
-            ],
-            label: [
-              { "justify-self": "start" },
-              { "align-self": "start" },
-              { "font-size": "13px" },
-              { opacity: "0.82" },
-              { "white-space": "normal" },
-              { "text-align": "left" },
-            ],
+            name: [{ "justify-self": "start" }, { "align-self": "end" }, { "font-size": "26px" }, { "font-weight": "700" }],
+            state: [{ "justify-self": "start" }, { "align-self": "center" }, { "font-size": "16px" }, { opacity: "0.95" }],
+            label: [{ "justify-self": "start" }, { "align-self": "start" }, { "font-size": "13px" }, { opacity: "0.82" }, { "white-space": "normal" }, { "text-align": "left" }],
           },
         },
         {
@@ -293,46 +260,11 @@ class InfraPowerPanel extends HTMLElement {
   }
 
   _generateButtonConfig(powerStateEntity, entityId, name, icon, kind) {
-    const matchState =
-      kind === "on"
-        ? "Encendido"
-        : kind === "off"
-        ? "Apagado"
-        : kind === "restart"
-        ? "Reiniciando"
-        : "";
-
-    const activeExpr =
-      kind === "refresh"
-        ? "false"
-        : `states['${powerStateEntity}']?.state === '${matchState}'`;
-
-    const bg =
-      kind === "on"
-        ? "rgba(80,220,130,0.28)"
-        : kind === "off"
-        ? "rgba(220,80,80,0.25)"
-        : kind === "restart"
-        ? "rgba(255,190,80,0.22)"
-        : "rgba(90,160,255,0.20)";
-
-    const border =
-      kind === "on"
-        ? "1px solid rgba(80,220,130,0.55)"
-        : kind === "off"
-        ? "1px solid rgba(220,80,80,0.55)"
-        : kind === "restart"
-        ? "1px solid rgba(255,190,80,0.45)"
-        : "1px solid rgba(90,160,255,0.45)";
-
-    const color =
-      kind === "on"
-        ? "rgb(110,230,140)"
-        : kind === "off"
-        ? "rgb(255,120,120)"
-        : kind === "restart"
-        ? "rgb(255,190,80)"
-        : "rgb(100,170,255)";
+    const matchState = kind === "on" ? "Encendido" : kind === "off" ? "Apagado" : kind === "restart" ? "Reiniciando" : "";
+    const activeExpr = kind === "refresh" ? "false" : `states['${powerStateEntity}']?.state === '${matchState}'`;
+    const bg = kind === "on" ? "rgba(80,220,130,0.28)" : kind === "off" ? "rgba(220,80,80,0.25)" : kind === "restart" ? "rgba(255,190,80,0.22)" : "rgba(90,160,255,0.20)";
+    const border = kind === "on" ? "1px solid rgba(80,220,130,0.55)" : kind === "off" ? "1px solid rgba(220,80,80,0.55)" : kind === "restart" ? "1px solid rgba(255,190,80,0.45)" : "1px solid rgba(90,160,255,0.45)";
+    const color = kind === "on" ? "rgb(110,230,140)" : kind === "off" ? "rgb(255,120,120)" : kind === "restart" ? "rgb(255,190,80)" : "rgb(100,170,255)";
 
     return {
       type: "custom:button-card",
@@ -349,51 +281,23 @@ class InfraPowerPanel extends HTMLElement {
         card: [
           { height: "48px" },
           { "border-radius": "12px" },
-          { "box-shadow": "none" },
-          { transition: "background 220ms ease, border 220ms ease, filter 180ms ease, transform 180ms ease" },
-          {
-            background: `[[[ return (${activeExpr}) ? '${bg}' : 'rgba(255,255,255,0.07)'; ]]]`,
-          },
-          {
-            border: `[[[ return (${activeExpr}) ? '${border}' : '1px solid rgba(255,255,255,0.08)'; ]]]`,
-          },
+          { background: `[[[ return (${activeExpr}) ? '${bg}' : 'rgba(255,255,255,0.07)'; ]]]` },
+          { border: `[[[ return (${activeExpr}) ? '${border}' : '1px solid rgba(255,255,255,0.08)'; ]]]` },
         ],
-        icon: [
-          { width: "22px" },
-          { height: "22px" },
-          { transition: "color 220ms ease, transform 180ms ease" },
-          {
-            color: `[[[ return (${activeExpr}) ? '${color}' : 'var(--primary-text-color)'; ]]]`,
-          },
-        ],
-        name: [
-          { "font-size": "12px" },
-          { "font-weight": "700" },
-        ],
+        icon: [{ width: "22px" }, { height: "22px" }, { color: `[[[ return (${activeExpr}) ? '${color}' : 'var(--primary-text-color)'; ]]]` }],
+        name: [{ "font-size": "12px" }, { "font-weight": "700" }],
       },
     };
   }
 
   _prettyName(base) {
-    return base
-      .split("_")
-      .map((word) => {
+    return base.split("_").map((word) => {
         const lower = word.toLowerCase();
         if (lower === "gpu") return "GPU";
         if (lower === "nas") return "NAS";
         return word.charAt(0).toUpperCase() + word.slice(1);
-      })
-      .join(" ");
+      }).join(" ");
   }
 }
 
 customElements.define("infra-power-panel", InfraPowerPanel);
-
-// Also register as a strategy just in case the user still wants to use it as a dashboard
-window.customStrategies = window.customStrategies || [];
-window.customStrategies.push({
-  type: "infra-power-monitor",
-  strategyType: "dashboard",
-  name: "Infra Power Monitor",
-  description: "Auto-generated dashboard for Infra Power Monitor",
-});
