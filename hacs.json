@@ -1,0 +1,6 @@
+{
+  "name": "Infra Power Monitor",
+  "content_in_root": false,
+  "render_readme": true,
+  "domains": ["infra_power_monitor"]
+}

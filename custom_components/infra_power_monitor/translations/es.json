@@ -1,0 +1,56 @@
+{
+  "title": "Infra Power Monitor",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Añadir dispositivo de infraestructura",
+        "description": "Elige cómo se controla este dispositivo.",
+        "data": {
+          "backend": "Backend",
+          "name": "Nombre visible"
+        }
+      },
+      "idrac": {
+        "title": "Configurar dispositivo iDRAC",
+        "description": "Conecta con un iDRAC Dell usando Redfish.",
+        "data": {
+          "host": "Host o IP",
+          "username": "Usuario",
+          "password": "Contraseña",
+          "verify_ssl": "Verificar certificado SSL",
+          "scan_interval": "Intervalo de sondeo (segundos)"
+        }
+      },
+      "redfish": {
+        "title": "Configurar dispositivo Redfish genérico",
+        "description": "Conecta con un BMC compatible con Redfish.",
+        "data": {
+          "host": "Host o IP",
+          "username": "Usuario",
+          "password": "Contraseña",
+          "verify_ssl": "Verificar certificado SSL",
+          "scan_interval": "Intervalo de sondeo (segundos)"
+        }
+      },
+      "wake_on_lan": {
+        "title": "Configurar dispositivo Wake-on-LAN",
+        "description": "Usa Wake-on-LAN para encender y ping/TCP para el estado.",
+        "data": {
+          "mac": "Dirección MAC",
+          "broadcast_address": "Dirección broadcast",
+          "status_host": "Host o IP para comprobar estado",
+          "status_port": "Puerto TCP para comprobar estado",
+          "use_icmp": "Usar ping ICMP en lugar de TCP",
+          "scan_interval": "Intervalo de sondeo (segundos)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "No se puede conectar",
+      "invalid_auth": "Autenticación inválida",
+      "invalid_redfish": "No se ha encontrado un servicio Redfish válido",
+      "already_configured": "Este dispositivo ya está configurado",
+      "unknown": "Error inesperado"
+    }
+  }
+}
