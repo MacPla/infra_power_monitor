@@ -1,10 +1,15 @@
 
-const VERSION = "1.1.1";
+const VERSION = "1.1.2";
 
 /**
- * Infra Power Monitor Panel - RESILIENT VERSION
+ * Infra Power Monitor Panel - SMART RESILIENT VERSION
  */
 class InfraPowerPanel extends HTMLElement {
+  constructor() {
+    super();
+    this._renderedKey = null;
+  }
+
   set hass(hass) {
     this._hass = hass;
     if (this._root) {
@@ -18,24 +23,10 @@ class InfraPowerPanel extends HTMLElement {
       this._root = this.shadowRoot;
       this._root.innerHTML = `
         <style>
-          :host {
-            display: block;
-            height: 100%;
-            background-color: var(--primary-background-color);
-            overflow-y: auto;
-            color: var(--primary-text-color);
-          }
-          .container {
-            padding: 24px;
-            max-width: 1400px;
-            margin: 0 auto;
-          }
+          :host { display: block; height: 100%; background-color: var(--primary-background-color); overflow-y: auto; color: var(--primary-text-color); }
+          .container { padding: 24px; max-width: 1400px; margin: 0 auto; }
           h1 { margin: 0 0 32px 0; font-size: 32px; font-weight: 300; }
-          .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-            gap: 24px;
-          }
+          .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 24px; }
         </style>
         <div class="container">
           <h1>Infra Power Monitor</h1>
@@ -43,6 +34,14 @@ class InfraPowerPanel extends HTMLElement {
         </div>
       `;
     }
+    
+    // Auto-retry once custom cards are defined
+    ["button-card", "stack-in-card"].forEach(card => {
+        customElements.whenDefined(card).then(() => {
+            this._renderedKey = null; // Force re-render
+            if (this._hass) this._update(this._hass);
+        });
+    });
   }
 
   async _update(hass) {
@@ -59,9 +58,8 @@ class InfraPowerPanel extends HTMLElement {
         return;
     }
 
-    // Detect available custom elements
-    const hasStack = customElements.get('stack-in-card') || customElements.get('hui-stack-in-card');
-    const hasButton = customElements.get('button-card') || customElements.get('hui-button-card');
+    const hasStack = !!customElements.get('stack-in-card') || !!customElements.get('hui-stack-in-card');
+    const hasButton = !!customElements.get('button-card') || !!customElements.get('hui-button-card');
     
     const key = JSON.stringify(powerStateEntities) + "_" + hasStack + "_" + hasButton;
     if (this._renderedKey === key) {
@@ -76,21 +74,20 @@ class InfraPowerPanel extends HTMLElement {
     if (!helpers) return;
 
     for (const entityId of powerStateEntities) {
-      const config = this._generateResilientConfig(entityId, states, hasStack, hasButton);
+      const config = this._generateConfig(entityId, states, hasStack, hasButton);
       const card = helpers.createCardElement(config);
       card.hass = hass;
       grid.appendChild(card);
     }
   }
 
-  _generateResilientConfig(entityId, states, hasStack, hasButton) {
+  _generateConfig(entityId, states, hasStack, hasButton) {
     const raw = entityId.replace(/^sensor\./, "");
     const match = raw.match(/^(.*?)(?:_power_state)(?:_(\d+))?$/);
     const base = match ? match[1] : raw;
     const suffix = (match && match[2]) ? `_${match[2]}` : "";
     const name = base.toUpperCase().replace(/_/g, " ");
 
-    // If we don't have the custom cards, use the built-in Entities card
     if (!hasStack || !hasButton) {
         return {
             type: "entities",
@@ -109,7 +106,6 @@ class InfraPowerPanel extends HTMLElement {
         };
     }
 
-    // Beautiful version (requires stack-in-card and button-card)
     return {
       type: "custom:stack-in-card",
       cards: [
