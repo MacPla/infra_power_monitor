@@ -8,6 +8,7 @@ from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_USERNA
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.frontend import async_register_built_in_panel
 
 from .const import (
     CONF_BACKEND,
@@ -42,7 +43,8 @@ def _register_infra_power_panel(hass: HomeAssistant) -> None:
         return
 
     try:
-        hass.components.frontend.async_register_built_in_panel(
+        async_register_built_in_panel(
+            hass,
             component_name="iframe",
             sidebar_title="Infra Power",
             sidebar_icon="mdi:server",
@@ -141,7 +143,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     if f"{DOMAIN}_static" not in hass.data:
-        hass.http.async_register_static_paths(
+        await hass.http.async_register_static_paths(
             [
                 StaticPathConfig(
                     "/infra_power_monitor",
