@@ -1,14 +1,23 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
 
+from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.lovelace.const import (
+    CONF_ICON,
+    CONF_REQUIRE_ADMIN,
+    CONF_SHOW_IN_SIDEBAR,
+    CONF_TITLE,
+    CONF_URL_PATH,
+)
+from homeassistant.components.lovelace.dashboard import (
+    DashboardsCollection,
+    LovelaceStorage,
+)
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.components.http import StaticPathConfig
-from homeassistant.components.frontend import async_register_built_in_panel
 
 from .const import (
     CONF_BACKEND,
@@ -34,101 +43,45 @@ from .providers.hybrid import HybridProvider
 
 _LOGGER = logging.getLogger(__name__)
 
-LOVELACE_STORAGE_FILE = os.path.join(".storage", "lovelace")
 INFRA_POWER_DASHBOARD_PATH = "infra-power"
-
-
-def _register_infra_power_panel(hass: HomeAssistant) -> None:
-    if f"{DOMAIN}_panel" in hass.data:
-        return
-
-    try:
-        async_register_built_in_panel(
-            hass,
-            component_name="lovelace",
-            sidebar_title="Infra Power",
-            sidebar_icon="mdi:server",
-            frontend_url_path="infra-power",
-            config={"url_path": "infra-power"},
-        )
-        hass.data[f"{DOMAIN}_panel"] = True
-    except Exception as exc:
-        _LOGGER.warning(
-            "Infra Power sidebar panel could not be registered: %s",
-            exc,
-        )
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     if hass.config_entries.async_entries(DOMAIN):
         await _async_ensure_infra_power_dashboard(hass)
 
-    _register_infra_power_panel(hass)
-
     return True
 
 
-def _read_lovelace_storage(storage_path: str) -> dict[str, object]:
-    if not os.path.exists(storage_path):
-        return {
-            "key": "lovelace",
-            "version": 1,
-            "data": {"dashboards": [], "resources": []},
-        }
-
-    with open(storage_path, "r", encoding="utf-8") as file:
-        return json.load(file)
-
-
-def _write_lovelace_storage(storage_path: str, data: dict[str, object]) -> None:
-    os.makedirs(os.path.dirname(storage_path), exist_ok=True)
-    with open(storage_path, "w", encoding="utf-8") as file:
-        json.dump(data, file, indent=2)
-
-
 async def _async_ensure_infra_power_dashboard(hass: HomeAssistant) -> None:
-    storage_path = hass.config.path(LOVELACE_STORAGE_FILE)
-    storage = await hass.async_add_executor_job(_read_lovelace_storage, storage_path)
+    dashboards_collection = DashboardsCollection(hass)
+    await dashboards_collection.async_load()
 
-    dashboards = storage.setdefault("data", {}).setdefault("dashboards", [])
     if any(
-        dashboard.get("url_path") == INFRA_POWER_DASHBOARD_PATH
-        for dashboard in dashboards
+        dashboard.get(CONF_URL_PATH) == INFRA_POWER_DASHBOARD_PATH
+        for dashboard in dashboards_collection.async_items()
     ):
         return
 
-    dashboards.append(
+    dashboard_item = await dashboards_collection.async_create_item(
         {
-            "id": "infra_power",
-            "url_path": INFRA_POWER_DASHBOARD_PATH,
-            "title": "Infra Power",
-            "icon": "mdi:server",
-            "show_in_sidebar": True,
-            "sidebar_title": "Infra Power",
-            "sidebar_icon": "mdi:server",
-            "require_admin": False,
-            "mode": "storage",
-            "views": [
-                {
-                    "id": "overview",
-                    "title": "Overview",
-                    "path": "overview",
-                    "icon": "mdi:server",
-                    "type": "sections",
-                    "max_columns": 4,
-                    "sections": [
-                        {
-                            "type": "grid",
-                            "column_span": 4,
-                            "cards": [],
-                        }
-                    ],
-                }
-            ],
+            CONF_URL_PATH: INFRA_POWER_DASHBOARD_PATH,
+            CONF_TITLE: "Infra Power",
+            CONF_ICON: "mdi:server",
+            CONF_SHOW_IN_SIDEBAR: True,
+            CONF_REQUIRE_ADMIN: False,
         }
     )
 
-    await hass.async_add_executor_job(_write_lovelace_storage, storage_path, storage)
+    dashboard_store = LovelaceStorage(
+        hass,
+        {"id": dashboard_item["id"], CONF_URL_PATH: INFRA_POWER_DASHBOARD_PATH},
+    )
+    await dashboard_store.async_save(
+        {
+            "strategy": {"type": "infra-power-monitor"},
+        }
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
