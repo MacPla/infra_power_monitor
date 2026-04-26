@@ -3,7 +3,10 @@
     "name": "Infra Power Monitor",
     "version": "1.0.0",
     "documentation": "https://github.com/macpla/infra_power_monitor",
-    "dependencies": [],
+    "dependencies": [
+        "http",
+        "lovelace"
+    ],
     "codeowners": [
         "@MacPla"
     ],
