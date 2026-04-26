@@ -45,11 +45,11 @@ def _register_infra_power_panel(hass: HomeAssistant) -> None:
     try:
         async_register_built_in_panel(
             hass,
-            component_name="iframe",
+            component_name="lovelace",
             sidebar_title="Infra Power",
             sidebar_icon="mdi:server",
             frontend_url_path="infra-power",
-            config={"url": "/lovelace/infra-power"},
+            config={"url_path": "infra-power"},
         )
         hass.data[f"{DOMAIN}_panel"] = True
     except Exception as exc:
