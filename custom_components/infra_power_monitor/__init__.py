@@ -169,9 +169,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         hass.data[f"{DOMAIN}_static"] = True
 
-    await _async_ensure_infra_power_dashboard(hass)
-    _register_infra_power_panel(hass)
-
     if backend == "idrac":
         provider = IdracProvider(
             entry.data[CONF_HOST],
