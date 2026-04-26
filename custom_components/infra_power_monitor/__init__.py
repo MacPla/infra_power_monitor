@@ -112,32 +112,38 @@ async def _async_ensure_infra_power_dashboard(hass: HomeAssistant) -> None:
             )
         return
 
-    dashboard_item = await dashboards_collection.async_create_item(
-        {
-            CONF_URL_PATH: INFRA_POWER_DASHBOARD_PATH,
-            CONF_TITLE: "Infra Power",
-            CONF_ICON: "mdi:server",
-            CONF_SHOW_IN_SIDEBAR: True,
-            CONF_REQUIRE_ADMIN: False,
-        }
-    )
+    try:
+        dashboard_item = await dashboards_collection.async_create_item(
+            {
+                CONF_URL_PATH: INFRA_POWER_DASHBOARD_PATH,
+                CONF_TITLE: "Infra Power",
+                CONF_ICON: "mdi:server",
+                CONF_SHOW_IN_SIDEBAR: True,
+                CONF_REQUIRE_ADMIN: False,
+            }
+        )
 
-    dashboard_store = LovelaceStorage(
-        hass,
-        {"id": dashboard_item["id"], CONF_URL_PATH: INFRA_POWER_DASHBOARD_PATH},
-    )
-    await dashboard_store.async_save(
-        {
-            "views": [
-                {
-                    "path": "overview",
-                    "title": "Overview",
-                    "icon": "mdi:server",
-                    "cards": [],
-                }
-            ]
-        }
-    )
+        dashboard_store = LovelaceStorage(
+            hass,
+            {"id": dashboard_item["id"], CONF_URL_PATH: INFRA_POWER_DASHBOARD_PATH},
+        )
+        await dashboard_store.async_save(
+            {
+                "views": [
+                    {
+                        "path": "overview",
+                        "title": "Overview",
+                        "icon": "mdi:server",
+                        "cards": [],
+                    }
+                ]
+            }
+        )
+    except Exception as exc:
+        _LOGGER.warning(
+            "Failed to create Infra Power dashboard: %s",
+            exc,
+        )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
