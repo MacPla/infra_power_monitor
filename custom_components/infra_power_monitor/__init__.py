@@ -80,10 +80,36 @@ async def _async_ensure_infra_power_dashboard(hass: HomeAssistant) -> None:
     dashboards_collection = DashboardsCollection(hass)
     await dashboards_collection.async_load()
 
-    if any(
-        dashboard.get(CONF_URL_PATH) == INFRA_POWER_DASHBOARD_PATH
-        for dashboard in dashboards_collection.async_items()
-    ):
+    existing_dashboard = None
+    for dashboard in dashboards_collection.async_items():
+        if dashboard.get(CONF_URL_PATH) == INFRA_POWER_DASHBOARD_PATH:
+            existing_dashboard = dashboard
+            break
+
+    if existing_dashboard:
+        dashboard_id = existing_dashboard.get("id")
+        dashboard_store = LovelaceStorage(
+            hass,
+            {"id": dashboard_id, CONF_URL_PATH: INFRA_POWER_DASHBOARD_PATH},
+        )
+        try:
+            config = await dashboard_store.async_load()
+        except Exception:
+            config = None
+
+        if config and "strategy" in config:
+            await dashboard_store.async_save(
+                {
+                    "views": [
+                        {
+                            "path": "overview",
+                            "title": "Overview",
+                            "icon": "mdi:server",
+                            "cards": [],
+                        }
+                    ]
+                }
+            )
         return
 
     dashboard_item = await dashboards_collection.async_create_item(
