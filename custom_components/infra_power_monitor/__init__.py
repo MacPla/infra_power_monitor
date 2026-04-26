@@ -55,6 +55,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         hass.data[f"{DOMAIN}_static"] = True
 
+    if f"{DOMAIN}_panel" not in hass.data:
+        hass.components.frontend.async_register_built_in_panel(
+            component_name="iframe",
+            sidebar_title="Infra Power",
+            sidebar_icon="mdi:server",
+            frontend_url_path="infra-power",
+            config={"url": "/lovelace/infra-power"},
+        )
+        hass.data[f"{DOMAIN}_panel"] = True
+
     if backend == "idrac":
         provider = IdracProvider(
             entry.data[CONF_HOST],
