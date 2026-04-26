@@ -60,10 +60,10 @@ def _register_infra_power_panel(hass: HomeAssistant) -> None:
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    _register_infra_power_panel(hass)
-
     if hass.config_entries.async_entries(DOMAIN):
-        hass.async_create_task(_async_ensure_infra_power_dashboard(hass))
+        await _async_ensure_infra_power_dashboard(hass)
+
+    _register_infra_power_panel(hass)
 
     return True
 
@@ -154,7 +154,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         hass.data[f"{DOMAIN}_static"] = True
 
-    _register_infra_power_panel(hass)
     await _async_ensure_infra_power_dashboard(hass)
 
     if backend == "idrac":
