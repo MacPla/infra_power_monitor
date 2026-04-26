@@ -1,5 +1,5 @@
 
-const VERSION = "1.0.7";
+const VERSION = "1.0.8";
 
 /**
  * Infra Power Monitor Panel
@@ -93,7 +93,6 @@ class InfraPowerPanel extends HTMLElement {
     // Only full redraw if entities changed
     const entitiesKey = JSON.stringify(powerStateEntities);
     if (this._renderedEntities === entitiesKey) {
-        // Just update Hass on existing cards
         Array.from(grid.children).forEach(card => {
             if (card.hass !== hass) card.hass = hass;
         });
@@ -103,19 +102,22 @@ class InfraPowerPanel extends HTMLElement {
     this._renderedEntities = entitiesKey;
     grid.innerHTML = '';
 
+    // Check for custom card availability
+    const hasStackInCard = customElements.get('stack-in-card') || customElements.get('hui-stack-in-card');
+    const hasButtonCard = customElements.get('button-card') || customElements.get('hui-button-card');
+
+    const helpers = window.loadCardHelpers ? await window.loadCardHelpers() : null;
+
     for (const entityId of powerStateEntities) {
-      const config = this._generateCardConfig(entityId, states);
+      const config = this._generateCardConfig(entityId, states, hasStackInCard, hasButtonCard);
       
-      // Use HA's internal card creator if available, or fallback to manual
       let card;
-      const helpers = window.loadCardHelpers ? await window.loadCardHelpers() : null;
-      
       if (helpers && helpers.createCardElement) {
           card = helpers.createCardElement(config);
       } else {
-          // Manual fallback (less reliable but works as backup)
-          card = document.createElement('hui-stack-in-card');
-          if (card.setConfig) card.setConfig(config);
+          // Absolute fallback if helpers are missing
+          card = document.createElement('div');
+          card.innerHTML = `<div style="padding: 10px; border: 1px solid red;">Error: No se pudo cargar el motor de tarjetas de HA</div>`;
       }
       
       card.hass = hass;
@@ -123,30 +125,18 @@ class InfraPowerPanel extends HTMLElement {
     }
   }
 
-  _generateCardConfig(powerStateEntity, states) {
+  _generateCardConfig(powerStateEntity, states, hasStackInCard, hasButtonCard) {
     const raw = powerStateEntity.replace(/^sensor\./, "");
-    // Try to extract base name. Matches "studio_power_state" or "truenas_power_state_2"
     const match = raw.match(/^(.*?)(?:_power_state)(?:_(\d+))?$/);
     if (!match) return { type: "error", error: "Entity name pattern mismatch" };
     
     const base = match[1];
     const suffix = match[2] ? `_${match[2]}` : "";
-
     const name = this._prettyName(base);
 
     const health = `sensor.${base}_health${suffix}`;
     const firmware = `sensor.${base}_firmware_version${suffix}`;
-
-    const tempCandidates = [
-      `sensor.${base}_cpu_temp${suffix}`,
-      `sensor.${base}_system_board_inlet_temp${suffix}`,
-      `sensor.${base}_system_temp${suffix}`,
-      `sensor.${base}_inlet_temp${suffix}`,
-      `sensor.${base}_mb_10g_temp${suffix}`,
-    ];
-    
-    const exists = (id) => !!states[id];
-    const temp = tempCandidates.find(exists) || "";
+    const temp = [`sensor.${base}_cpu_temp${suffix}`, `sensor.${base}_system_temp${suffix}`].find(id => !!states[id]) || "";
 
     const buttonDefs = [
       [`button.${base}_power_on${suffix}`, "ON", "mdi:power", "on"],
@@ -156,101 +146,69 @@ class InfraPowerPanel extends HTMLElement {
     ];
 
     const buttons = buttonDefs.map(([entityId, label, icon, kind]) =>
-      this._generateButtonConfig(powerStateEntity, entityId, label, icon, kind)
+      this._generateButtonConfig(powerStateEntity, entityId, label, icon, kind, hasButtonCard)
     );
 
-    return {
-      type: "custom:stack-in-card",
-      cards: [
-        {
-          type: "custom:button-card",
-          entity: powerStateEntity,
-          name,
-          icon: "mdi:server",
-          show_state: true,
-          show_label: true,
-          tap_action: { action: "more-info" },
-          variables: {
-            health_entity: health,
-            temp_entity: temp,
-            firmware_entity: firmware,
-          },
-          label: `[[[
-            const valid = v => v && v !== 'unknown' && v !== 'unavailable';
-            const health = states[variables.health_entity]?.state;
-            const temp = variables.temp_entity ? states[variables.temp_entity]?.state : undefined;
-            const fw = states[variables.firmware_entity]?.state;
+    // Main Card Config
+    const mainCard = hasButtonCard ? {
+      type: "custom:button-card",
+      entity: powerStateEntity,
+      name,
+      icon: "mdi:server",
+      show_state: true,
+      show_label: true,
+      tap_action: { action: "more-info" },
+      variables: {
+        health_entity: health,
+        temp_entity: temp,
+        firmware_entity: firmware,
+      },
+      label: `[[[
+        const valid = v => v && v !== 'unknown' && v !== 'unavailable';
+        const health = states[variables.health_entity]?.state;
+        const temp = variables.temp_entity ? states[variables.temp_entity]?.state : undefined;
+        const fw = states[variables.firmware_entity]?.state;
 
-            const parts = [];
-            if (valid(health)) parts.push(\`Health: \${health}\`);
-            if (valid(temp)) parts.push(\`Temp: \${temp} °C\`);
-            if (valid(fw)) parts.push(\`FW: \${fw}\`);
-            return parts.join(' · ');
-          ]]]`,
-          styles: {
-            card: [
-              { "border-radius": "18px 18px 0 0" },
-              { padding: "18px" },
-              { height: "170px" },
-              {
-                "background-color": `[[[
-                  const s = (entity.state || '').trim();
-                  if (s === 'Encendido') return 'rgba(5,47,20,0.95)';
-                  if (s === 'Apagado') return 'rgba(35,35,35,0.86)';
-                  if (s === 'Arrancando') return 'rgba(18,44,88,0.95)';
-                  if (s === 'Apagando') return 'rgba(90,54,10,0.95)';
-                  if (s === 'Reiniciando') return 'rgba(97,57,12,0.95)';
-                  return 'rgba(25,25,25,0.86)';
-                ]]]`,
-              },
-              {
-                "background-image": `[[[
-                  const s = (entity.state || '').trim();
-                  if (s === 'Encendido') return 'linear-gradient(135deg, rgba(8,77,33,0.98), rgba(5,47,20,0.98))';
-                  if (s === 'Apagado') return 'linear-gradient(135deg, rgba(58,58,58,0.68), rgba(32,32,32,0.92))';
-                  if (s === 'Arrancando') return 'linear-gradient(135deg, rgba(24,66,130,0.98), rgba(18,44,88,0.98))';
-                  if (s === 'Apagando') return 'linear-gradient(135deg, rgba(130,85,20,0.98), rgba(90,54,10,0.98))';
-                  if (s === 'Reiniciando') return 'linear-gradient(135deg, rgba(146,101,23,0.98), rgba(97,57,12,0.98))';
-                  return 'linear-gradient(135deg, rgba(45,45,45,0.72), rgba(25,25,25,0.92))';
-                ]]]`,
-              },
-              {
-                border: `[[[
-                  const s = (entity.state || '').trim();
-                  if (s === 'Encendido') return '1px solid rgba(80,220,130,0.45)';
-                  if (s === 'Apagado') return '1px solid rgba(180,180,180,0.22)';
-                  if (s === 'Arrancando') return '1px solid rgba(90,160,255,0.45)';
-                  if (s === 'Apagando' || s === 'Reiniciando') return '1px solid rgba(255,190,80,0.45)';
-                  return '1px solid rgba(160,160,160,0.18)';
-                ]]]`,
-              },
-            ],
-            grid: [
-              { "grid-template-areas": '"i n" "i s" "i l"' },
-              { "grid-template-columns": "72px 1fr" },
-              { "grid-template-rows": "min-content min-content 1fr" },
-              { "row-gap": "6px" },
-              { "column-gap": "14px" },
-            ],
-            icon: [
-              { width: "54px" },
-              { height: "54px" },
-              {
-                color: `[[[
-                  const s = (entity.state || '').trim();
-                  if (s === 'Encendido') return 'rgb(110,230,140)';
-                  if (s === 'Apagado') return 'rgb(180,180,180)';
-                  if (s === 'Arrancando') return 'rgb(100,170,255)';
-                  if (s === 'Apagando' || s === 'Reiniciando') return 'rgb(255,190,80)';
-                  return 'rgb(150,150,150)';
-                ]]]`,
-              },
-            ],
-            name: [{ "justify-self": "start" }, { "align-self": "end" }, { "font-size": "26px" }, { "font-weight": "700" }],
-            state: [{ "justify-self": "start" }, { "align-self": "center" }, { "font-size": "16px" }, { opacity: "0.95" }],
-            label: [{ "justify-self": "start" }, { "align-self": "start" }, { "font-size": "13px" }, { opacity: "0.82" }, { "white-space": "normal" }, { "text-align": "left" }],
+        const parts = [];
+        if (valid(health)) parts.push(\`Health: \${health}\`);
+        if (valid(temp)) parts.push(\`Temp: \${temp} °C\`);
+        if (valid(fw)) parts.push(\`FW: \${fw}\`);
+        return parts.join(' · ');
+      ]]]`,
+      styles: {
+        card: [
+          { "border-radius": "18px 18px 0 0" },
+          { padding: "18px" },
+          { height: "170px" },
+          {
+            "background-color": `[[[
+              const s = (entity.state || '').trim();
+              if (s === 'Encendido') return 'rgba(5,47,20,0.95)';
+              if (s === 'Apagado') return 'rgba(35,35,35,0.86)';
+              return 'rgba(25,25,25,0.86)';
+            ]]]`,
           },
-        },
+        ],
+        grid: [
+          { "grid-template-areas": '"i n" "i s" "i l"' },
+          { "grid-template-columns": "72px 1fr" },
+          { "row-gap": "6px" },
+        ],
+        icon: [{ width: "54px" }, { height: "54px" }],
+        name: [{ "justify-self": "start" }, { "font-size": "26px" }, { "font-weight": "700" }],
+        state: [{ "justify-self": "start" }, { "font-size": "16px" }],
+        label: [{ "justify-self": "start" }, { "font-size": "13px" }, { opacity: "0.82" }],
+      },
+    } : {
+      type: "entities",
+      title: name,
+      entities: [powerStateEntity, health, firmware].filter(id => !!states[id])
+    };
+
+    return {
+      type: hasStackInCard ? "custom:stack-in-card" : "vertical-stack",
+      cards: [
+        mainCard,
         {
           type: "horizontal-stack",
           cards: buttons,
@@ -259,12 +217,12 @@ class InfraPowerPanel extends HTMLElement {
     };
   }
 
-  _generateButtonConfig(powerStateEntity, entityId, name, icon, kind) {
+  _generateButtonConfig(powerStateEntity, entityId, name, icon, kind, hasButtonCard) {
+    if (!hasButtonCard) {
+        return { type: "button", entity: entityId, icon, name };
+    }
     const matchState = kind === "on" ? "Encendido" : kind === "off" ? "Apagado" : kind === "restart" ? "Reiniciando" : "";
     const activeExpr = kind === "refresh" ? "false" : `states['${powerStateEntity}']?.state === '${matchState}'`;
-    const bg = kind === "on" ? "rgba(80,220,130,0.28)" : kind === "off" ? "rgba(220,80,80,0.25)" : kind === "restart" ? "rgba(255,190,80,0.22)" : "rgba(90,160,255,0.20)";
-    const border = kind === "on" ? "1px solid rgba(80,220,130,0.55)" : kind === "off" ? "1px solid rgba(220,80,80,0.55)" : kind === "restart" ? "1px solid rgba(255,190,80,0.45)" : "1px solid rgba(90,160,255,0.45)";
-    const color = kind === "on" ? "rgb(110,230,140)" : kind === "off" ? "rgb(255,120,120)" : kind === "restart" ? "rgb(255,190,80)" : "rgb(100,170,255)";
 
     return {
       type: "custom:button-card",
@@ -281,22 +239,16 @@ class InfraPowerPanel extends HTMLElement {
         card: [
           { height: "48px" },
           { "border-radius": "12px" },
-          { background: `[[[ return (${activeExpr}) ? '${bg}' : 'rgba(255,255,255,0.07)'; ]]]` },
-          { border: `[[[ return (${activeExpr}) ? '${border}' : '1px solid rgba(255,255,255,0.08)'; ]]]` },
+          { background: `[[[ return (${activeExpr}) ? 'rgba(80,220,130,0.28)' : 'rgba(255,255,255,0.07)'; ]]]` },
         ],
-        icon: [{ width: "22px" }, { height: "22px" }, { color: `[[[ return (${activeExpr}) ? '${color}' : 'var(--primary-text-color)'; ]]]` }],
+        icon: [{ width: "22px" }, { height: "22px" }],
         name: [{ "font-size": "12px" }, { "font-weight": "700" }],
       },
     };
   }
 
   _prettyName(base) {
-    return base.split("_").map((word) => {
-        const lower = word.toLowerCase();
-        if (lower === "gpu") return "GPU";
-        if (lower === "nas") return "NAS";
-        return word.charAt(0).toUpperCase() + word.slice(1);
-      }).join(" ");
+    return base.split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   }
 }
 
