@@ -5,7 +5,8 @@
     "documentation": "https://github.com/macpla/infra_power_monitor",
     "dependencies": [
         "http",
-        "lovelace"
+        "lovelace",
+        "panel_custom"
     ],
     "codeowners": [
         "@MacPla"
