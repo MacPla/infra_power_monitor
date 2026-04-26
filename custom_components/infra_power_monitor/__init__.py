@@ -4,21 +4,23 @@ import logging
 import os
 
 from homeassistant.components import panel_custom
-from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
+
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "infra_power_monitor"
-VERSION = "1.0.3"
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON]
+VERSION = "1.0.4"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Infra Power Monitor component."""
     
     # Register static path for the dashboard JS
-    # We point to the www folder
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(
@@ -30,7 +32,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     )
 
     # Register the custom panel (Alarmo style)
-    # Using a unique path 'infra-power-monitor' to avoid conflicts with previous dashboards
     if "infra-power-monitor" not in hass.data.get("frontend_panels", {}):
         await panel_custom.async_register_panel(
             hass,
@@ -46,6 +47,17 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up from a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+    
+    # Forward the setup to the platforms (sensor, button)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    
     return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    return unload_ok
