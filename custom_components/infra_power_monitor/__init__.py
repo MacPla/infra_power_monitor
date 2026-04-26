@@ -52,8 +52,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(
-                f"/{DOMAIN}",
-                hass.config.path(f"custom_components/{DOMAIN}/www"),
+                "/infra_power_monitor_static",
+                os.path.join(os.path.dirname(__file__), "www"),
                 False,
             )
         ]
