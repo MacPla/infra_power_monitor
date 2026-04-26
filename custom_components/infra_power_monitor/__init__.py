@@ -102,7 +102,14 @@ async def _async_ensure_infra_power_dashboard(hass: HomeAssistant) -> None:
     )
     await dashboard_store.async_save(
         {
-            "strategy": {"type": "infra-power-monitor"},
+            "views": [
+                {
+                    "path": "overview",
+                    "title": "Overview",
+                    "icon": "mdi:server",
+                    "cards": [],
+                }
+            ]
         }
     )
 
