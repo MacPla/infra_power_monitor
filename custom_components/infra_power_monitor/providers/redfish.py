@@ -104,11 +104,12 @@ class RedfishProvider(BaseProvider):
         except ValueError as exc:
             raise InvalidRedfish(f"Invalid JSON from {path} on {self.host}") from exc
 
-    def _discover_paths(self) -> None:
+    def _discover_paths(self, root: dict | None = None) -> None:
         if self._systems_path and self._manager_path and self._chassis_path:
             return
 
-        root = self._json("GET", "/redfish/v1/")
+        if root is None:
+            root = self._json("GET", "/redfish/v1/")
         systems_root = root.get("Systems", {}).get("@odata.id")
         managers_root = root.get("Managers", {}).get("@odata.id")
         chassis_root = root.get("Chassis", {}).get("@odata.id")
@@ -139,10 +140,10 @@ class RedfishProvider(BaseProvider):
         return self._cached_unique_id or self.host
 
     def get_device_snapshot(self) -> DeviceSnapshot:
-        self._discover_paths()
+        root = self._json("GET", "/redfish/v1/")
+        self._discover_paths(root)
         assert self._systems_path is not None
 
-        root = self._json("GET", "/redfish/v1/")
         system = self._json("GET", self._systems_path)
         manager = self._json("GET", self._manager_path) if self._manager_path else {}
         chassis = self._json("GET", self._chassis_path) if self._chassis_path else {}
