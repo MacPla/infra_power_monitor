@@ -21,6 +21,7 @@ from .const import (
     CONF_STATUS_PORT,
     CONF_USE_ICMP,
     CONF_VERIFY_SSL,
+    CONF_ENABLE_PANEL,
     DEFAULT_HELPER_PATH,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SSH_KEY_PATH,
@@ -28,6 +29,7 @@ from .const import (
     DEFAULT_USE_ICMP,
     DEFAULT_VERIFY_SSL,
     DEFAULT_WOL_BROADCAST,
+    DEFAULT_ENABLE_PANEL,
     DOMAIN,
 )
 
@@ -216,6 +218,38 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=schema,
             errors=errors,
             description_placeholders={"description": HYBRID_DESCRIPTION},
+        )
+
+    @staticmethod
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> OptionsFlowHandler:
+        """Get the options flow for this handler."""
+        return OptionsFlowHandler(config_entry)
+
+
+class OptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle options flow for Infra Power Monitor."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_ENABLE_PANEL,
+                        default=self.config_entry.options.get(
+                            CONF_ENABLE_PANEL, DEFAULT_ENABLE_PANEL
+                        ),
+                    ): bool,
+                }
+            ),
         )
 
 

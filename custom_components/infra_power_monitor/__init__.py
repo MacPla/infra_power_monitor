@@ -35,7 +35,7 @@ from .providers.hybrid import HybridProvider
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON]
-VERSION = "1.0.6"
+VERSION = "1.2.3"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -52,23 +52,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         ]
     )
 
-    # Register the custom panel (Alarmo style)
-    # Using a different path to avoid any previous conflicts
-    if "infra_power_monitor" not in hass.data.get("frontend_panels", {}):
-        try:
-            await panel_custom.async_register_panel(
-                hass,
-                webcomponent_name="infra-power-panel",
-                frontend_url_path="infra_power_monitor",
-                module_url=f"/infra_power_monitor_static/infra-power-dashboard.js?v={VERSION}_{int(os.path.getmtime(os.path.join(os.path.dirname(__file__), 'www', 'infra-power-dashboard.js')))}",
-                sidebar_title="Infra Power",
-                sidebar_icon="mdi:server",
-                require_admin=False,
-                config={},
-            )
-        except Exception as err:
-            _LOGGER.warning("Could not register panel: %s", err)
-
     return True
 
 
@@ -78,6 +61,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     name = entry.data.get(CONF_NAME, entry.title)
 
     _LOGGER.warning("Setting up Infra Power Monitor entry: %s (backend: %s)", name, backend)
+
+    # Register the custom panel (Alarmo style)
+    if "infra_power_monitor" not in hass.data.get("frontend_panels", {}):
+        if entry.options.get(CONF_ENABLE_PANEL, DEFAULT_ENABLE_PANEL):
+            try:
+                await panel_custom.async_register_panel(
+                    hass,
+                    webcomponent_name="infra-power-panel",
+                    frontend_url_path="infra_power_monitor",
+                    module_url=f"/infra_power_monitor_static/infra-power-dashboard.js?v={VERSION}_{int(os.path.getmtime(os.path.join(os.path.dirname(__file__), 'www', 'infra-power-dashboard.js')))}",
+                    sidebar_title="Infra Power Monitor",
+                    sidebar_icon="mdi:server-network",
+                    require_admin=False,
+                    config={},
+                )
+            except Exception as err:
+                _LOGGER.warning("Could not register panel: %s", err)
 
     try:
         if backend == "idrac":
