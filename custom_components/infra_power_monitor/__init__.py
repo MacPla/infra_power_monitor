@@ -22,9 +22,11 @@ from .const import (
     CONF_OS_TYPE,
     CONF_SSH_USER,
     CONF_SSH_KEY_PATH,
+    CONF_ENABLE_PANEL,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SSH_KEY_PATH,
     DEFAULT_HELPER_PATH,
+    DEFAULT_ENABLE_PANEL,
     DOMAIN,
 )
 from .coordinator import InfraPowerCoordinator
