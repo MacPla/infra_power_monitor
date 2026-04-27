@@ -52,5 +52,15 @@
       "already_configured": "Este dispositivo ya está configurado",
       "unknown": "Error inesperado"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configuración de Infra Power Monitor",
+        "data": {
+          "enable_panel": "Activar panel en la barra lateral"
+        }
+      }
+    }
   }
 }

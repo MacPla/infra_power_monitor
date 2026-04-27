@@ -52,5 +52,15 @@
       "already_configured": "This device is already configured",
       "unknown": "Unexpected error"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Infra Power Monitor Settings",
+        "data": {
+          "enable_panel": "Show panel in sidebar"
+        }
+      }
+    }
   }
 }

@@ -37,7 +37,7 @@ from .providers.hybrid import HybridProvider
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON]
-VERSION = "1.2.3"
+VERSION = "1.2.4"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
