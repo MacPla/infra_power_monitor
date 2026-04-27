@@ -1,15 +1,18 @@
 
-const VERSION = "1.2.2";
+const VERSION = "1.2.3";
 
 /**
- * Infra Power Monitor Panel - ULTRA OPTIMIZED
+ * Infra Power Monitor Panel - FINAL PERFORMANCE POLISH
  */
-if (!customElements.get('infra-power-panel')) {
+(function() {
+  if (customElements.get('infra-power-panel')) return;
+
   class InfraPowerPanel extends HTMLElement {
     constructor() {
       super();
       this._renderedKey = null;
-      this._lastStates = {};
+      this._powerEntities = null;
+      this._lastStateCount = 0;
     }
 
     set hass(hass) {
@@ -52,7 +55,6 @@ if (!customElements.get('infra-power-panel')) {
         };
       }
 
-      // Smart auto-detection (stops after success)
       this._checkInterval = setInterval(() => {
           if (customElements.get('button-card') && customElements.get('stack-in-card')) {
               this._renderedKey = null;
@@ -63,34 +65,37 @@ if (!customElements.get('infra-power-panel')) {
     }
 
     disconnectedCallback() {
-        if (this._checkInterval) clearInterval(this._checkInterval);
+      if (this._checkInterval) clearInterval(this._checkInterval);
     }
 
     async _update(hass, oldHass, force = false) {
       const grid = this._root.getElementById('grid');
       if (!grid) return;
 
-      const powerEntities = Object.keys(hass.states).filter(id => id.includes('_power_state')).sort();
-      
-      // OPTIMIZATION: Only proceed if our entities actually changed state
+      const stateKeys = Object.keys(hass.states);
+      if (!this._powerEntities || force || Math.abs(stateKeys.length - this._lastStateCount) > 5) {
+          this._powerEntities = stateKeys.filter(id => id.includes('_power_state')).sort();
+          this._lastStateCount = stateKeys.length;
+      }
+
       let changed = force;
       if (!changed && oldHass) {
-          for (const id of powerEntities) {
+          for (const id of this._powerEntities) {
               if (hass.states[id]?.state !== oldHass.states[id]?.state) {
                   changed = true;
                   break;
               }
           }
       }
+
       if (!changed && this._renderedKey) {
-          // Just update Hass on existing cards without redrawing
           Array.from(grid.children).forEach(c => { if (c.hass !== hass) c.hass = hass; });
           return;
       }
 
       const hasStack = !!customElements.get('stack-in-card');
       const hasButton = !!customElements.get('button-card');
-      const key = JSON.stringify(powerEntities) + "_" + hasStack + "_" + hasButton;
+      const key = JSON.stringify(this._powerEntities) + "_" + hasStack + "_" + hasButton;
 
       if (this._renderedKey === key && !force) {
           Array.from(grid.children).forEach(c => { if (c.hass !== hass) c.hass = hass; });
@@ -103,7 +108,7 @@ if (!customElements.get('infra-power-panel')) {
       const helpers = window.loadCardHelpers ? await window.loadCardHelpers() : null;
       if (!helpers) return;
 
-      for (const entityId of powerEntities) {
+      for (const entityId of this._powerEntities) {
         const config = this._generateConfig(entityId, hass.states, hasStack, hasButton);
         const card = helpers.createCardElement(config);
         card.hass = hass;
@@ -169,5 +174,10 @@ if (!customElements.get('infra-power-panel')) {
       };
     }
   }
-  customElements.define("infra-power-panel", InfraPowerPanel);
-}
+
+  try {
+    customElements.define("infra-power-panel", InfraPowerPanel);
+  } catch (e) {
+    // Already defined
+  }
+})();
