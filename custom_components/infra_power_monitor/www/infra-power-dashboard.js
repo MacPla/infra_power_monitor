@@ -181,6 +181,13 @@ class InfraPowerPanel extends HTMLElement {
     // PREMIUM DESIGN
     return {
       type: "custom:stack-in-card",
+      keep: {
+        background: true,
+        box_shadow: true,
+        margin: true,
+        outer_padding: true,
+        border_radius: true
+      },
       cards: [
         {
           type: "custom:button-card",
