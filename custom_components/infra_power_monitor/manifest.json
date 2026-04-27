@@ -1,7 +1,7 @@
 {
     "domain": "infra_power_monitor",
     "name": "Infra Power Monitor",
-    "version": "1.2.4",
+    "version": "1.2.5",
     "documentation": "https://github.com/macpla/infra_power_monitor",
     "dependencies": [
         "http",

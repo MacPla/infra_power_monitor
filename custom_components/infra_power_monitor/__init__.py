@@ -2,6 +2,7 @@
 
 import logging
 import os
+import time
 import asyncio
 
 from homeassistant.components import panel_custom
@@ -37,7 +38,7 @@ from .providers.hybrid import HybridProvider
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON]
-VERSION = "1.2.4"
+VERSION = "1.2.5"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -72,7 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     hass,
                     webcomponent_name="infra-power-panel",
                     frontend_url_path="infra_power_monitor",
-                    module_url=f"/infra_power_monitor_static/infra-power-dashboard.js?v={VERSION}_{int(os.path.getmtime(os.path.join(os.path.dirname(__file__), 'www', 'infra-power-dashboard.js')))}",
+                    module_url=f"/infra_power_monitor_static/infra-power-dashboard.js?v={VERSION}_{int(time.time())}",
                     sidebar_title="Infra Power Monitor",
                     sidebar_icon="mdi:server-network",
                     require_admin=False,

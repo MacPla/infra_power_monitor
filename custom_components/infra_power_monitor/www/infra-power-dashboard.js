@@ -1,9 +1,9 @@
 
-const VERSION = "1.2.4";
+const VERSION = "1.2.5";
 
 /**
- * Infra Power Monitor Panel - PRO NATIVE ARCHITECTURE
- * No dependencies on HACS cards. Instant, fluid, and professional.
+ * Infra Power Monitor Panel - ULTRA FAST NATIVE UI
+ * Optimized for large installations. Zero lag.
  */
 (function() {
   if (customElements.get('infra-power-panel')) return;
@@ -12,13 +12,19 @@ const VERSION = "1.2.4";
     constructor() {
       super();
       this.attachShadow({ mode: 'open' });
-      this._powerEntities = [];
+      this._powerEntities = null;
       this._cardElements = {};
+      this._lastUpdate = 0;
     }
 
     set hass(hass) {
       this._hass = hass;
-      this._update();
+      // Only process updates if at least 100ms have passed (throttling)
+      const now = Date.now();
+      if (now - this._lastUpdate > 100) {
+          this._lastUpdate = now;
+          this._update();
+      }
     }
 
     connectedCallback() {
@@ -59,9 +65,8 @@ const VERSION = "1.2.4";
           .action-btn { padding: 12px 8px; border: none; background: transparent; color: inherit; cursor: pointer; font-size: 11px; font-weight: 600; text-transform: uppercase; display: flex; flex-direction: column; align-items: center; gap: 4px; transition: background 0.2s; opacity: 0.8; }
           .action-btn:hover { background: rgba(255,255,255,0.05); opacity: 1; }
           .action-btn ha-icon { --mdc-icon-size: 20px; }
-          .action-btn.disabled { opacity: 0.2; cursor: default; }
           
-          .loading-msg { padding: 50px; text-align: center; opacity: 0.5; font-size: 18px; }
+          .empty-msg { padding: 50px; text-align: center; opacity: 0.5; font-size: 18px; }
         </style>
         <div class="app-wrapper">
           <div class="header">
@@ -69,7 +74,7 @@ const VERSION = "1.2.4";
             <div class="title">Infra Power Monitor</div>
           </div>
           <div class="content">
-            <div id="grid" class="grid"><div class="loading-msg">Escaneando infraestructura...</div></div>
+            <div id="grid" class="grid"></div>
           </div>
         </div>
       `;
@@ -84,29 +89,16 @@ const VERSION = "1.2.4";
       const grid = this.shadowRoot.getElementById('grid');
       if (!hass || !grid) return;
 
-      // Filter entities once or when count changes
-      const allEntities = Object.keys(hass.states);
-      if (allEntities.length !== this._lastGlobalCount) {
-          this._powerEntities = allEntities.filter(id => id.includes('_power_state')).sort();
-          this._lastGlobalCount = allEntities.length;
+      // OPTIMIZATION: Only search for entities once, or when a manual refresh is needed
+      if (this._powerEntities === null) {
+          console.log("InfraPowerPanel: Scanning for servers...");
+          this._powerEntities = Object.keys(hass.states).filter(id => id.includes('_power_state')).sort();
       }
 
       if (this._powerEntities.length === 0) {
-          grid.innerHTML = '<div class="loading-msg">No se han encontrado servidores configurados.</div>';
+          grid.innerHTML = '<div class="empty-msg">No se han encontrado servidores configurados.</div>';
           return;
       }
-
-      // Check if we need to remove or add cards
-      const currentIds = new Set(this._powerEntities);
-      Object.keys(this._cardElements).forEach(id => {
-          if (!currentIds.has(id)) {
-              this._cardElements[id].remove();
-              delete this._cardElements[id];
-          }
-      });
-
-      // Clear loading message if needed
-      if (grid.querySelector('.loading-msg')) grid.innerHTML = '';
 
       this._powerEntities.forEach(id => {
           if (!this._cardElements[id]) {
@@ -128,17 +120,14 @@ const VERSION = "1.2.4";
       const suffix = entityId.includes("_power_state_") ? "_" + entityId.split("_power_state_")[1] : "";
       const name = base.toUpperCase().replace(/_/g, " ");
 
-      // Get health and temp
       const health = this._hass.states[`sensor.${base}_health${suffix}`]?.state || '';
       const temp = this._hass.states[`sensor.${base}_cpu_temp${suffix}`]?.state || '';
       const extra = (health ? `Health: ${health}` : '') + (temp ? ` · Temp: ${temp}°C` : '');
 
-      // Determine color class
       let colorClass = 'off';
       if (['encendido', 'on', 'online'].includes(state)) colorClass = 'on';
       else if (['arrancando', 'reiniciando', 'apaguando', 'starting', 'restarting', 'stopping'].some(s => state.includes(s))) colorClass = 'process';
 
-      // Only update if something changed
       const versionKey = `${state}_${extra}_${name}`;
       if (container._versionKey === versionKey) return;
       container._versionKey = versionKey;
@@ -162,9 +151,9 @@ const VERSION = "1.2.4";
         </div>
       `;
 
-      // Bind actions
       container.querySelectorAll('.action-btn').forEach(btn => {
-          btn.onclick = () => {
+          btn.onclick = (e) => {
+              e.stopPropagation();
               const eid = btn.dataset.entity;
               const [domain, service] = eid.split('.');
               this._hass.callService(domain, 'press', { entity_id: eid });
