@@ -60,7 +60,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 hass,
                 webcomponent_name="infra-power-panel",
                 frontend_url_path="infra_power_monitor",
-                module_url=f"/infra_power_monitor_static/infra-power-dashboard.js?v={VERSION}",
+                module_url=f"/infra_power_monitor_static/infra-power-dashboard.js?v={VERSION}_{int(os.path.getmtime(os.path.join(os.path.dirname(__file__), 'www', 'infra-power-dashboard.js')))}",
                 sidebar_title="Infra Power",
                 sidebar_icon="mdi:server",
                 require_admin=False,

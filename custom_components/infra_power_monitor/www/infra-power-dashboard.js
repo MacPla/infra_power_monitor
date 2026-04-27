@@ -204,10 +204,11 @@ class InfraPowerPanel extends HTMLElement {
               { padding: "20px" },
               { height: "150px" },
               { background: `[[[
-                  const s = entity.state;
-                  if (s === 'Encendido') return 'linear-gradient(135deg, #0a4a22 0%, #052f14 100%)';
-                  if (s === 'Apagado') return 'linear-gradient(135deg, #333 0%, #1a1a1a 100%)';
-                  if (s === 'Arrancando' || s === 'Reiniciando') return 'linear-gradient(135deg, #122c58 0%, #0a1832 100%)';
+                  const s = (entity.state || '').toLowerCase().trim();
+                  if (s === 'encendido' || s === 'on') return 'linear-gradient(135deg, #0a4a22 0%, #052f14 100%)';
+                  if (s === 'apagado' || s === 'off') return 'linear-gradient(135deg, #333 0%, #1a1a1a 100%)';
+                  if (s === 'arrancando' || s === 'reiniciando' || s === 'starting' || s === 'restarting') return 'linear-gradient(135deg, #122c58 0%, #0a1832 100%)';
+                  if (s === 'apagando' || s === 'stopping') return 'linear-gradient(135deg, #5a360a 0%, #321e05 100%)';
                   return 'var(--card-background-color)';
                 ]]]` 
               }
