@@ -12,8 +12,9 @@
     "documentation": "https://github.com/macpla/infra_power_monitor",
     "integration_type": "device",
     "iot_class": "local_polling",
+    "issue_tracker": "https://github.com/macpla/infra_power_monitor/issues",
     "requirements": [
         "paramiko>=3.3.1"
     ],
-    "version": "1.2.7"
+    "version": "1.2.8"
 }
