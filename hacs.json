@@ -2,6 +2,5 @@
   "name": "Infra Power Monitor",
   "render_readme": true,
   "country": "ES",
-  "homeassistant": "2024.1.0",
-  "icon": "https://raw.githubusercontent.com/MacPla/infra_power_monitor/main/icon.png"
+  "homeassistant": "2024.1.0"
 }
