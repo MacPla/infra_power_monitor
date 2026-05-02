@@ -1,19 +1,19 @@
 {
     "domain": "infra_power_monitor",
     "name": "Infra Power Monitor",
-    "version": "1.2.6",
-    "documentation": "https://github.com/macpla/infra_power_monitor",
+    "codeowners": [
+        "@MacPla"
+    ],
+    "config_flow": true,
     "dependencies": [
         "http",
         "panel_custom"
     ],
-    "codeowners": [
-        "@MacPla"
-    ],
+    "documentation": "https://github.com/macpla/infra_power_monitor",
+    "integration_type": "device",
+    "iot_class": "local_polling",
     "requirements": [
         "paramiko>=3.3.1"
     ],
-    "iot_class": "local_polling",
-    "config_flow": true,
-    "integration_type": "device"
+    "version": "1.2.7"
 }
